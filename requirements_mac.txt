@@ -113,4 +113,4 @@ websockets==14.1
 yarl==1.18.3
 zstandard==0.23.0
 python-dotenv>=1.0.1
-pandas>=2.2.3
+pandas>=2.2.3f
