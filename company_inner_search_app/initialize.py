@@ -19,7 +19,10 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 import company_inner_search_app.constants as ct
-
+from company_inner_search_app.constants import RETRIEVER_K
+from company_inner_search_app.constants import CHUNK_SIZE, CHUNK_OVERLAP
+from company_inner_search_app.constants import INITIALIZE_ERROR_MESSAGE
+from langchain.schema import Document
 
 ############################################################
 # 設定関連
@@ -123,19 +126,37 @@ def initialize_retriever():
     
     # チャンク分割用のオブジェクトを作成
     text_splitter = CharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50,
+        chunk_size= CHUNK_SIZE,
+        chunk_overlap= CHUNK_OVERLAP,
         separator="\n"
     )
 
     # チャンク分割を実施
     splitted_docs = text_splitter.split_documents(docs_all)
 
+    # チャンク分割を実施しないドキュメントを分離して処理
+    """
+    docs_no_split = [doc for doc in docs_all if doc.metadata.get("no_split")]
+    docs_to_split = [doc for doc in docs_all if not doc.metadata.get("no_split")]
+
+    splitted_docs = text_splitter.split_documents(docs_to_split)
+    splitted_docs.extend(docs_no_split)
+    """
+
+    #デバック用
+    print(f"読み込んだデータソース数: {len(docs_all)}")
+    print(f"チャンク分割後のデータソース数: {len(splitted_docs)}")
+    print("チャンク分割後のデータソースの例")
+    print(splitted_docs[0].metadata)
+    print(splitted_docs[0].page_content[:200])
+
+
+
     # ベクターストアの作成
     db = Chroma.from_documents(splitted_docs, embedding=embeddings)
 
     # ベクターストアを検索するRetrieverの作成
-    st.session_state.retriever = db.as_retriever(search_kwargs={"k": 3})
+    st.session_state.retriever = db.as_retriever(search_kwargs={"k": RETRIEVER_K})
 
 
 def initialize_session_state():
@@ -217,7 +238,35 @@ def file_load(path, docs_all):
         # ファイルの拡張子に合ったdata loaderを使ってデータ読み込み
         loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)
         docs = loader.load()
+
+        #PDFの場合はページ番号をメタデータとして追加
+        if file_extension == ".pdf":
+            for i, doc in enumerate(docs):
+                # メタデータにページ番号を追加
+                doc.metadata["page"] = i + 1 
+
         docs_all.extend(docs)
+
+        # デバッグ用：PDFの場合のページ番号確認
+        if file_extension == ".pdf":
+            for doc in docs:
+                print(f"{doc.metadata['source']} のページ: {doc.metadata['page']}")
+
+        #CSVの場合は①行ごとに読み込み②各行ごとに「ラベル：値」の形式で文字列を作る③各行をまとめて1つの文字列にする④まとめた文字列で１つのDocumentを作成してdocs_allに追加
+        #csvのメタデータに"no_split"フラグを追加
+        """
+        if file_extension == ".csv":
+            import pandas as pd
+            df = pd.read_csv(path, encoding="utf-8")
+            all_text = ""
+            for index, row in df.iterrows():
+                row_text = ", ".join([f"{col}: {row[col]}" for col in df.columns])
+                all_text += row_text + "\n"
+            #metadata = {"source": file_name, "no_split": True}
+            doc = Document(page_content=all_text, metadata=metadata)
+            docs_all.append(doc)
+        """
+
 
 
 def adjust_string(s):
