@@ -1,1 +1,2 @@
-# company_inner_search_app
+# company_inner_search_app_社内情報特化型の生成AI検索アプリ
+#仕様：社内文章検索または、社内問い合わせを選択し、チャット形式で質問を入力すると生成AIが解凍する
